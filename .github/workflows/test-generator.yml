@@ -1,0 +1,63 @@
+name: Test Generator Script
+
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  JAVA_VERSION: '21'
+
+jobs:
+  test:
+    name: Generate & Build Validation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+          check-latest: true
+          cache: gradle
+
+      - name: Run generator script with automated inputs
+        run: |
+          printf 'TestApp\ncom.example.testapp\n./test-app\n24\n\n\n#FFFFFF\nY\n' | bash create-android-app.sh
+
+      - name: Detect compileSdk from generated project
+        id: detect-sdk
+        run: |
+          COMPILE_SDK=$(grep -oP 'compileSdk\s*=\s*\K\d+' test-app/app/build.gradle.kts)
+          echo "compileSdk=${COMPILE_SDK}" >> "$GITHUB_OUTPUT"
+
+      - name: Install required Android SDK platform
+        env:
+          SDK: ${{ steps.detect-sdk.outputs.compileSdk }}
+        run: |
+          echo "Installing platform android-${SDK}..."
+          yes | "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" \
+            "platforms;android-${SDK}" 2>&1
+
+      - name: Build generated project (assembleDebug)
+        working-directory: ./test-app
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon --stacktrace
+
+      - name: Upload build reports (on failure)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-reports
+          path: test-app/app/build/reports/
+          retention-days: 3
