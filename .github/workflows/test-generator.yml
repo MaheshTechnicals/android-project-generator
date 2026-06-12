@@ -137,17 +137,17 @@ jobs:
           else
             STATUS="FAILURE"
           fi
-          cat > test-app/build-report.txt << EOF
-============================
-   Build Report
-============================
-Status      : ${STATUS}
-Timestamp   : $(date -u '+%Y-%m-%d %H:%M:%S UTC')
-Project     : TestApp
-Package     : com.example.testapp
-Repository  : ${{ github.repository }}
-Commit      : ${{ github.sha }}
-EOF
+          {
+            echo "============================"
+            echo "   Build Report"
+            echo "============================"
+            echo "Status      : ${STATUS}"
+            echo "Timestamp   : $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+            echo "Project     : TestApp"
+            echo "Package     : com.example.testapp"
+            echo "Repository  : ${{ github.repository }}"
+            echo "Commit      : ${{ github.sha }}"
+          } > test-app/build-report.txt
 
       - name: Upload build artifacts
         if: always()
