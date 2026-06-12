@@ -164,6 +164,23 @@ my-app/
 | Build     | `assembleDebug` (debug), `assembleRelease` + `bundleRelease` (release) | Same                           |
 | Release   | Auto GitHub Release on tag                       | Auto GitLab Release on tag                        |
 
+### Signing Release Builds
+
+The generated project supports two naming conventions for signing secrets — modern (`ANDROID_*`) and legacy (`KEY_*`/`KEYSTORE_*`). Modern names take precedence; if neither is set, release builds fall back to the debug keystore (unsigned).
+
+| Secret                    | Description                          |
+|---------------------------|--------------------------------------|
+| `ANDROID_SIGNING_KEY`     | Base64-encoded keystore file         |
+| `ANDROID_KEYSTORE_PASSWORD` | Keystore password                  |
+| `ANDROID_ALIAS`           | Key alias                            |
+| `ANDROID_KEY_PASSWORD`    | Key password                         |
+| `KEYSTORE_BASE64`         | *(legacy)* Base64-encoded keystore   |
+| `KEYSTORE_PASSWORD`       | *(legacy)* Keystore password         |
+| `KEY_ALIAS`               | *(legacy)* Key alias                 |
+| `KEY_PASSWORD`            | *(legacy)* Key password              |
+
+> **Note:** When both a modern and legacy variable are present, the `ANDROID_*` variable wins. This is safe to configure alongside existing `KEY_*`/`KEYSTORE_*` secrets during migration.
+
 ---
 
 ## 🎨 Icon Generation

@@ -531,6 +531,27 @@ android {
         }
     }
 
+    signingConfigs {
+        create("release") {
+            storeFile = rootProject.file("app/release.keystore").takeIf { it.exists() }
+            storePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")
+                ?.ifEmpty { null }
+                ?: System.getenv("KEYSTORE_PASSWORD")
+                ?.ifEmpty { null }
+                ?: ""
+            keyAlias = System.getenv("ANDROID_ALIAS")
+                ?.ifEmpty { null }
+                ?: System.getenv("KEY_ALIAS")
+                ?.ifEmpty { null }
+                ?: ""
+            keyPassword = System.getenv("ANDROID_KEY_PASSWORD")
+                ?.ifEmpty { null }
+                ?: System.getenv("KEY_PASSWORD")
+                ?.ifEmpty { null }
+                ?: ""
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled   = true
@@ -539,7 +560,12 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            signingConfig = signingConfigs.getByName("debug") // swap with release key in CI
+            val releaseSigning = signingConfigs.getByName("release")
+            signingConfig = if (releaseSigning.storeFile?.exists() == true
+                && releaseSigning.storePassword?.isNotEmpty() == true
+                && releaseSigning.keyAlias?.isNotEmpty() == true
+                && releaseSigning.keyPassword?.isNotEmpty() == true
+            ) releaseSigning else signingConfigs.getByName("debug")
         }
         debug {
             applicationIdSuffix = ".debug"
@@ -1235,10 +1261,12 @@ jobs:
 
       - name: Decode keystore
         env:
-          KEYSTORE_BASE64: \${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_BASE64:     \${{ secrets.KEYSTORE_BASE64 }}
+          ANDROID_SIGNING_KEY: \${{ secrets.ANDROID_SIGNING_KEY }}
         run: |
-          if [ -n "\$KEYSTORE_BASE64" ]; then
-            echo "\$KEYSTORE_BASE64" | base64 -d > app/release.keystore
+          SIGNING_KEY="\${ANDROID_SIGNING_KEY:-\$KEYSTORE_BASE64}"
+          if [ -n "\$SIGNING_KEY" ]; then
+            echo "\$SIGNING_KEY" | base64 -d > app/release.keystore
             echo "KEYSTORE_AVAILABLE=true" >> \$GITHUB_ENV
           else
             echo "KEYSTORE_AVAILABLE=false" >> \$GITHUB_ENV
@@ -1247,16 +1275,22 @@ jobs:
 
       - name: Build release APK
         env:
-          KEYSTORE_PASSWORD: \${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_ALIAS:         \${{ secrets.KEY_ALIAS }}
-          KEY_PASSWORD:      \${{ secrets.KEY_PASSWORD }}
+          KEYSTORE_PASSWORD:       \${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS:               \${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD:            \${{ secrets.KEY_PASSWORD }}
+          ANDROID_KEYSTORE_PASSWORD: \${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_ALIAS:           \${{ secrets.ANDROID_ALIAS }}
+          ANDROID_KEY_PASSWORD:    \${{ secrets.ANDROID_KEY_PASSWORD }}
         run: ./gradlew assembleRelease --no-daemon
 
       - name: Build release AAB
         env:
-          KEYSTORE_PASSWORD: \${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_ALIAS:         \${{ secrets.KEY_ALIAS }}
-          KEY_PASSWORD:      \${{ secrets.KEY_PASSWORD }}
+          KEYSTORE_PASSWORD:       \${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS:               \${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD:            \${{ secrets.KEY_PASSWORD }}
+          ANDROID_KEYSTORE_PASSWORD: \${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_ALIAS:           \${{ secrets.ANDROID_ALIAS }}
+          ANDROID_KEY_PASSWORD:    \${{ secrets.ANDROID_KEY_PASSWORD }}
         run: ./gradlew bundleRelease --no-daemon
 
       - name: Upload release APK
@@ -1392,8 +1426,9 @@ build-release:
   <<: *setup-sdk
   script:
     - |
-      if [ -n "\$KEYSTORE_BASE64" ]; then
-        echo "\$KEYSTORE_BASE64" | base64 -d > app/release.keystore
+      SIGNING_KEY="\${ANDROID_SIGNING_KEY:-\$KEYSTORE_BASE64}"
+      if [ -n "\$SIGNING_KEY" ]; then
+        echo "\$SIGNING_KEY" | base64 -d > app/release.keystore
       fi
     - ./gradlew assembleRelease bundleRelease --no-daemon
   artifacts:
@@ -1532,12 +1567,20 @@ git push origin v1.0.0
 
 ### Required Secrets (for signed release builds)
 
-| Secret              | Description                     |
-|---------------------|---------------------------------|
-| \`KEYSTORE_BASE64\`   | Base64-encoded keystore file    |
-| \`KEYSTORE_PASSWORD\` | Keystore password               |
-| \`KEY_ALIAS\`         | Key alias                       |
-| \`KEY_PASSWORD\`      | Key password                    |
+You can use either the legacy or modern naming — the build checks both (modern takes precedence).
+
+| Secret                    | Description                          |
+|---------------------------|--------------------------------------|
+| \`ANDROID_SIGNING_KEY\`     | Base64-encoded keystore file         |
+| \`ANDROID_KEYSTORE_PASSWORD\` | Keystore password                 |
+| \`ANDROID_ALIAS\`           | Key alias                            |
+| \`ANDROID_KEY_PASSWORD\`    | Key password                         |
+| \`KEYSTORE_BASE64\`         | *(legacy)* Base64-encoded keystore   |
+| \`KEYSTORE_PASSWORD\`       | *(legacy)* Keystore password         |
+| \`KEY_ALIAS\`               | *(legacy)* Key alias                 |
+| \`KEY_PASSWORD\`            | *(legacy)* Key password              |
+
+> **Note:** The `ANDROID_*` variables take priority over the legacy `KEY_*` / `KEYSTORE_*` variables. If neither is set, the release build will be unsigned (uses debug keystore as fallback).
 
 ## Package
 
