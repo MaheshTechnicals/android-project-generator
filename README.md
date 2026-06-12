@@ -1,6 +1,6 @@
 # Android Project Generator 🚀
 
-**Create professional Android Kotlin + Jetpack Compose projects in seconds — right from your terminal.**
+**Create a ready-to-code Android Hello World app from your terminal — no Android Studio required.**
 
 [![GitHub release](https://img.shields.io/github/v/release/MaheshTechnicals/android-project-generator?style=flat-square)](https://github.com/MaheshTechnicals/android-project-generator/releases)
 [![License](https://img.shields.io/github/license/MaheshTechnicals/android-project-generator?style=flat-square)](LICENSE)
@@ -11,18 +11,35 @@
 
 ## 📖 Overview
 
-**Android Project Generator** is a powerful Bash-based CLI tool that interactively scaffolds a complete, production-ready Android project with:
+### Why this script exists
 
-- ✅ **Kotlin** + **Jetpack Compose** (Material 3)
-- ✅ **Gradle Kotlin DSL** with version catalog (`libs.versions.toml`)
-- ✅ **Adaptive & legacy launcher icons** (auto-generated with ImageMagick)
-- ✅ **Dual CI/CD** — GitHub Actions + GitLab CI pipelines
-- ✅ **JUnit 4 + Espresso + Compose UI tests**
-- ✅ **ProGuard** minification for release builds
-- ✅ **Fastlane** metadata structure
-- ✅ **Dynamic version fetching** — always gets latest stable AGP, Kotlin, Gradle, Compose BOM
+AI code editors like Cursor and VS Code are very popular now. When you want to start a new Android project, you usually have to:
 
-No Android Studio needed. No IDE required. Just a terminal, Java, and a few seconds.
+1. Open **Android Studio** (a heavy app that needs installation)
+2. Click through menus to create a new project
+3. Wait for Gradle sync
+4. Then finally start working on your code
+
+But many developers just want a **simple Hello World app with a proper file structure** so they can open it in their AI editor and start coding right away.
+
+This script solves that problem. It creates a complete Android Hello World application with all the right files — no Android Studio needed. You just run one command, answer a few simple questions, and you get a ready-to-code project. Open the folder in Cursor, VS Code, or any editor and start building your app.
+
+### What it does
+
+- Creates a **Kotlin + Jetpack Compose** project with all required files
+- Auto-generates **launcher icons** (with or without ImageMagick)
+- Sets up **GitHub Actions and GitLab CI/CD workflows** — so even if your laptop is not powerful enough to build Android apps, you can push your code and let GitHub/GitLab build it for you
+- Fetches the **latest stable versions** of AGP, Kotlin, Gradle, and Compose BOM at runtime
+- Creates unit tests, UI tests, and everything needed for a professional project structure
+
+### Who it's for
+
+- **Developers using AI code editors** — quickly generate a project and start working with AI assistance
+- **Anyone with a low-end laptop** — generate the project locally, build remotely via GitHub/GitLab CI
+- **Android phone users** — install Debian/Ubuntu (XFCE4 desktop) via Termux, set up VS Code or Cursor, run this script, and create Android projects right from your phone. Use GitHub/GitLab workflows to build
+- **Anyone who wants to skip Android Studio setup** — just the terminal, Java, and a few seconds
+
+> Only a terminal, Java 21+, and a few seconds are needed.
 
 ---
 
