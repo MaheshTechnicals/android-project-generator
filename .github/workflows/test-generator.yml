@@ -83,15 +83,38 @@ jobs:
           fi
           chmod +x gradlew
 
+      - name: Show Android SDK state
+        run: |
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          echo "--- Platforms ---"
+          ls "$ANDROID_SDK_ROOT/platforms/" 2>/dev/null || echo "none"
+          echo "--- Build-tools ---"
+          ls "$ANDROID_SDK_ROOT/build-tools/" 2>/dev/null || echo "none"
+          echo "--- Cmdline-tools ---"
+          ls "$ANDROID_SDK_ROOT/cmdline-tools/" 2>/dev/null || echo "none"
+
+      - name: Add kotlin-android plugin to generated project
+        run: |
+          echo "" >> test-app/gradle/libs.versions.toml
+          echo "kotlin-android = { id = \"org.jetbrains.kotlin.android\", version.ref = \"kotlin\" }" >> test-app/gradle/libs.versions.toml
+          sed -i '/alias(libs.plugins.kotlin.compose) apply false/a\    alias(libs.plugins.kotlin.android) apply false' test-app/build.gradle.kts
+          sed -i '/alias(libs.plugins.kotlin.compose)/a\    alias(libs.plugins.kotlin.android)' test-app/app/build.gradle.kts
+          # Disable configuration cache in gradle.properties
+          sed -i 's/org.gradle.configuration-cache=true/org.gradle.configuration-cache=false/' test-app/gradle.properties
+
       - name: Build generated project (assembleDebug)
         working-directory: ./test-app
         run: |
-          ./gradlew assembleDebug --no-daemon --no-configuration-cache --stacktrace
+          ./gradlew assembleDebug --no-daemon --no-configuration-cache 2>&1 | tee /tmp/build-output.log
 
-      - name: Upload build reports (on failure)
+      - name: Upload build output and reports (on failure)
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: build-reports
-          path: test-app/app/build/reports/
+          name: build-output
+          path: |
+            /tmp/build-output.log
+            test-app/app/build/reports/
+            test-app/app/build/outputs/
           retention-days: 3
