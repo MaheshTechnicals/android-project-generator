@@ -44,13 +44,22 @@ jobs:
           COMPILE_SDK=$(grep -oP 'compileSdk\s*=\s*\K\d+' test-app/app/build.gradle.kts)
           echo "compileSdk=${COMPILE_SDK}" >> "$GITHUB_OUTPUT"
 
-      - name: Install required Android SDK platform
+      - name: Install Android SDK platform
         env:
           SDK: ${{ steps.detect-sdk.outputs.compileSdk }}
         run: |
-          echo "Installing platform android-${SDK}..."
-          yes | "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" \
-            "platforms;android-${SDK}" 2>&1
+          SDKMAN="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
+          if yes | "$SDKMAN" "platforms;android-${SDK}" 2>&1; then
+            echo "SDK_INSTALLED=$SDK" >> "$GITHUB_ENV"
+          else
+            echo "android-${SDK} not available, finding latest..."
+            AVAILABLE=$("$SDKMAN" --list 2>/dev/null | grep -oP 'platforms;android-(\d+)' | grep -oP '\d+' | sort -rn | head -1)
+            echo "Installing android-${AVAILABLE} instead..."
+            yes | "$SDKMAN" "platforms;android-${AVAILABLE}" 2>&1
+            echo "SDK_INSTALLED=$AVAILABLE" >> "$GITHUB_ENV"
+            sed -i -E "s/compileSdk\s*=\s*${SDK}/compileSdk = ${AVAILABLE}/" test-app/app/build.gradle.kts
+            sed -i -E "s/targetSdk\s*=\s*${SDK}/targetSdk = ${AVAILABLE}/" test-app/app/build.gradle.kts
+          fi
 
       - name: Build generated project (assembleDebug)
         working-directory: ./test-app
