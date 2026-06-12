@@ -129,6 +129,47 @@ jobs:
         run: |
           ./gradlew assembleDebug --no-daemon --no-configuration-cache 2>&1 | tee /tmp/build-output.log
 
+      - name: Check signing secrets
+        env:
+          ANDROID_SIGNING_KEY: ${{ secrets.ANDROID_SIGNING_KEY }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_ALIAS: ${{ secrets.ANDROID_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          if [ -n "$ANDROID_SIGNING_KEY" ] || [ -n "$KEYSTORE_BASE64" ]; then
+            echo "SIGNING_KEYS_AVAILABLE=true" >> $GITHUB_ENV
+            echo "SIGNING_KEYS_SOURCE=modern" >> $GITHUB_ENV
+            echo "SIGNING_KEYS_DETECTED=yes" >> $GITHUB_ENV
+          elif [ -n "$ANDROID_KEYSTORE_PASSWORD" ] || [ -n "$KEYSTORE_PASSWORD" ] \
+             || [ -n "$ANDROID_ALIAS" ] || [ -n "$KEY_ALIAS" ] \
+             || [ -n "$ANDROID_KEY_PASSWORD" ] || [ -n "$KEY_PASSWORD" ]; then
+            echo "SIGNING_KEYS_AVAILABLE=true" >> $GITHUB_ENV
+            echo "SIGNING_KEYS_SOURCE=partial" >> $GITHUB_ENV
+            echo "SIGNING_KEYS_DETECTED=yes" >> $GITHUB_ENV
+          else
+            echo "SIGNING_KEYS_AVAILABLE=false" >> $GITHUB_ENV
+            echo "SIGNING_KEYS_SOURCE=none" >> $GITHUB_ENV
+            echo "SIGNING_KEYS_DETECTED=no" >> $GITHUB_ENV
+          fi
+
+      - name: Validate signing config in generated project
+        run: |
+          if grep -q "signingConfigs" test-app/app/build.gradle.kts; then
+            echo "SIGNING_CONFIG_PRESENT=true" >> $GITHUB_ENV
+            if grep -q "ANDROID_KEYSTORE_PASSWORD" test-app/app/build.gradle.kts; then
+              echo "SIGNING_CONFIG_ENV_VARS=ANDROID_* + legacy" >> $GITHUB_ENV
+            else
+              echo "SIGNING_CONFIG_ENV_VARS=unknown" >> $GITHUB_ENV
+            fi
+          else
+            echo "SIGNING_CONFIG_PRESENT=false" >> $GITHUB_ENV
+            echo "SIGNING_CONFIG_ENV_VARS=none" >> $GITHUB_ENV
+          fi
+
       - name: Generate build report
         if: always()
         run: |
@@ -141,13 +182,19 @@ jobs:
             echo "============================"
             echo "   Build Report"
             echo "============================"
-            echo "Status      : ${STATUS}"
-            echo "Timestamp   : $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
-            echo "Project     : TestApp"
-            echo "Package     : com.example.testapp"
-            echo "Repository  : ${{ github.repository }}"
-            echo "Commit      : ${{ github.sha }}"
+            echo "Status                : ${STATUS}"
+            echo "Timestamp             : $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+            echo "Project               : TestApp"
+            echo "Package               : com.example.testapp"
+            echo "Repository            : ${{ github.repository }}"
+            echo "Commit                : ${{ github.sha }}"
+            echo "------------------------"
+            echo "Signing Keys Detected : ${SIGNING_KEYS_DETECTED:-unknown}"
+            echo "Signing Key Source    : ${SIGNING_KEYS_SOURCE:-unknown}"
+            echo "Signing Config Present: ${SIGNING_CONFIG_PRESENT:-unknown}"
+            echo "Config Env Vars       : ${SIGNING_CONFIG_ENV_VARS:-unknown}"
           } > test-app/build-report.txt
+          cat test-app/build-report.txt
 
       - name: Upload build artifacts
         if: always()
