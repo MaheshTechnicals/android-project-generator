@@ -44,32 +44,49 @@ jobs:
           COMPILE_SDK=$(grep -oP 'compileSdk\s*=\s*\K\d+' test-app/app/build.gradle.kts)
           echo "compileSdk=${COMPILE_SDK}" >> "$GITHUB_OUTPUT"
 
-      - name: Install Android SDK platform
+      - name: Install Android SDK platform and build-tools
         env:
           SDK: ${{ steps.detect-sdk.outputs.compileSdk }}
         run: |
           SDKMAN="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
-          if yes | "$SDKMAN" "platforms;android-${SDK}" 2>&1; then
-            echo "SDK_INSTALLED=$SDK" >> "$GITHUB_ENV"
-            exit 0
-          fi
+          try_install() {
+            local ver=$1
+            yes | "$SDKMAN" "platforms;android-${ver}" 2>&1 && \
+            yes | "$SDKMAN" "build-tools;${ver}.0.0" 2>&1
+          }
+          try_install "$SDK" && echo "SDK_INSTALLED=$SDK" >> "$GITHUB_ENV" && exit 0
           echo "android-${SDK} not available, trying fallback platforms..."
           for FALLBACK in 36 35 34 33; do
-            if yes | "$SDKMAN" "platforms;android-${FALLBACK}" 2>&1; then
-              echo "SDK_INSTALLED=$FALLBACK" >> "$GITHUB_ENV"
-              sed -i -E "s/compileSdk\s*=\s*[0-9]+/compileSdk = ${FALLBACK}/" test-app/app/build.gradle.kts
-              sed -i -E "s/targetSdk\s*=\s*[0-9]+/targetSdk = ${FALLBACK}/" test-app/app/build.gradle.kts
+            try_install "$FALLBACK" && \
+              echo "SDK_INSTALLED=$FALLBACK" >> "$GITHUB_ENV" && \
+              sed -i -E "s/compileSdk\s*=\s*[0-9]+/compileSdk = ${FALLBACK}/" test-app/app/build.gradle.kts && \
+              sed -i -E "s/targetSdk\s*=\s*[0-9]+/targetSdk = ${FALLBACK}/" test-app/app/build.gradle.kts && \
               exit 0
-            fi
           done
           echo "ERROR: No Android SDK platform could be installed!"
           exit 1
 
+      - name: Verify and fix gradle wrapper
+        working-directory: ./test-app
+        run: |
+          if [ ! -f gradle/wrapper/gradle-wrapper.jar ] || [ ! -s gradle/wrapper/gradle-wrapper.jar ]; then
+            echo "gradle-wrapper.jar missing, downloading..."
+            GRADLE_VER=$(grep -oP 'distributionUrl=.*gradle-\K[^-]+(?=-bin.zip)' gradle/wrapper/gradle-wrapper.properties)
+            curl -sL "https://github.com/gradle/gradle/raw/v${GRADLE_VER}/gradle/wrapper/gradle-wrapper.jar" \
+              -o gradle/wrapper/gradle-wrapper.jar || {
+              echo "Download from gradle repo failed, extracting from full Gradle distribution..."
+              curl -sL "https://services.gradle.org/distributions/gradle-${GRADLE_VER}-bin.zip" -o /tmp/gradle.zip
+              mkdir -p /tmp/gradle-extract
+              unzip -q -o /tmp/gradle.zip -d /tmp/gradle-extract
+              find /tmp/gradle-extract -name "gradle-wrapper*.jar" -exec cp {} gradle/wrapper/gradle-wrapper.jar \; 2>/dev/null || true
+            }
+          fi
+          chmod +x gradlew
+
       - name: Build generated project (assembleDebug)
         working-directory: ./test-app
         run: |
-          chmod +x gradlew
-          ./gradlew assembleDebug --no-daemon --stacktrace
+          ./gradlew assembleDebug --no-daemon --no-configuration-cache --stacktrace
 
       - name: Upload build reports (on failure)
         if: failure()
