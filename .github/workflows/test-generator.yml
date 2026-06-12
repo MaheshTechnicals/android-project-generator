@@ -51,15 +51,19 @@ jobs:
           SDKMAN="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
           if yes | "$SDKMAN" "platforms;android-${SDK}" 2>&1; then
             echo "SDK_INSTALLED=$SDK" >> "$GITHUB_ENV"
-          else
-            echo "android-${SDK} not available, finding latest..."
-            AVAILABLE=$("$SDKMAN" --list 2>/dev/null | grep -oP 'platforms;android-(\d+)' | grep -oP '\d+' | sort -rn | head -1)
-            echo "Installing android-${AVAILABLE} instead..."
-            yes | "$SDKMAN" "platforms;android-${AVAILABLE}" 2>&1
-            echo "SDK_INSTALLED=$AVAILABLE" >> "$GITHUB_ENV"
-            sed -i -E "s/compileSdk\s*=\s*${SDK}/compileSdk = ${AVAILABLE}/" test-app/app/build.gradle.kts
-            sed -i -E "s/targetSdk\s*=\s*${SDK}/targetSdk = ${AVAILABLE}/" test-app/app/build.gradle.kts
+            exit 0
           fi
+          echo "android-${SDK} not available, trying fallback platforms..."
+          for FALLBACK in 36 35 34 33; do
+            if yes | "$SDKMAN" "platforms;android-${FALLBACK}" 2>&1; then
+              echo "SDK_INSTALLED=$FALLBACK" >> "$GITHUB_ENV"
+              sed -i -E "s/compileSdk\s*=\s*[0-9]+/compileSdk = ${FALLBACK}/" test-app/app/build.gradle.kts
+              sed -i -E "s/targetSdk\s*=\s*[0-9]+/targetSdk = ${FALLBACK}/" test-app/app/build.gradle.kts
+              exit 0
+            fi
+          done
+          echo "ERROR: No Android SDK platform could be installed!"
+          exit 1
 
       - name: Build generated project (assembleDebug)
         working-directory: ./test-app
