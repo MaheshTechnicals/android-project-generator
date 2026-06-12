@@ -129,13 +129,32 @@ jobs:
         run: |
           ./gradlew assembleDebug --no-daemon --no-configuration-cache 2>&1 | tee /tmp/build-output.log
 
-      - name: Upload build output and reports (on failure)
-        if: failure()
+      - name: Generate build report
+        if: always()
+        run: |
+          if grep -q "BUILD SUCCESSFUL" /tmp/build-output.log 2>/dev/null; then
+            STATUS="SUCCESS"
+          else
+            STATUS="FAILURE"
+          fi
+          cat > test-app/build-report.txt << EOF
+============================
+   Build Report
+============================
+Status      : ${STATUS}
+Timestamp   : $(date -u '+%Y-%m-%d %H:%M:%S UTC')
+Project     : TestApp
+Package     : com.example.testapp
+Repository  : ${{ github.repository }}
+Commit      : ${{ github.sha }}
+EOF
+
+      - name: Upload build artifacts
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: build-output
+          name: build-artifacts
           path: |
+            test-app/build-report.txt
             /tmp/build-output.log
-            test-app/app/build/reports/
-            test-app/app/build/outputs/
           retention-days: 3
