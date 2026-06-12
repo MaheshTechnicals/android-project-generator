@@ -49,22 +49,41 @@ jobs:
           SDK: ${{ steps.detect-sdk.outputs.compileSdk }}
         run: |
           SDKMAN="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
-          # If the expected platform directory exists, use it directly
-          if [ -d "$ANDROID_SDK_ROOT/platforms/android-${SDK}" ]; then
-            echo "android-${SDK} already installed"
-            echo "SDK_INSTALLED=$SDK" >> "$GITHUB_ENV"
+          PLATFORMS="$ANDROID_SDK_ROOT/platforms"
+
+          use_platform() {
+            local ver=$1
+            echo "Using android-${ver}"
+            echo "SDK_INSTALLED=$ver" >> "$GITHUB_ENV"
+          }
+
+          # Check if the exact platform directory exists
+          if [ -d "$PLATFORMS/android-${SDK}" ]; then
+            use_platform "$SDK"
             exit 0
           fi
-          echo "android-${SDK} not pre-installed, trying to install via SDK manager..."
+
+          # Try to symlink if a differently-named match exists (e.g. android-37.0 for SDK 37)
+          PLATFORM_DIR=$(ls -d "$PLATFORMS/android-${SDK}".* 2>/dev/null | head -1)
+          if [ -n "$PLATFORM_DIR" ]; then
+            ln -s "$PLATFORM_DIR" "$PLATFORMS/android-${SDK}"
+            echo "Symlinked $(basename "$PLATFORM_DIR") -> android-${SDK}"
+            use_platform "$SDK"
+            exit 0
+          fi
+
+          # Try to install via SDK manager
+          echo "android-${SDK} not found, trying to install..."
           if yes | "$SDKMAN" "platforms;android-${SDK}" 2>&1; then
-            echo "SDK_INSTALLED=$SDK" >> "$GITHUB_ENV"
+            use_platform "$SDK"
             exit 0
           fi
+
+          # Fallback to pre-installed lower platforms
           echo "android-${SDK} not available, trying fallback platforms..."
           for FALLBACK in 36 35 34; do
-            if [ -d "$ANDROID_SDK_ROOT/platforms/android-${FALLBACK}" ]; then
-              echo "android-${FALLBACK} already installed, using it"
-              echo "SDK_INSTALLED=${FALLBACK}" >> "$GITHUB_ENV"
+            if [ -d "$PLATFORMS/android-${FALLBACK}" ]; then
+              use_platform "$FALLBACK"
               sed -i -E "s/compileSdk\s*=\s*[0-9]+/compileSdk = ${FALLBACK}/" test-app/app/build.gradle.kts
               sed -i -E "s/targetSdk\s*=\s*[0-9]+/targetSdk = ${FALLBACK}/" test-app/app/build.gradle.kts
               exit 0
