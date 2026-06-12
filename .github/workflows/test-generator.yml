@@ -29,6 +29,11 @@ jobs:
           java-version: ${{ env.JAVA_VERSION }}
           check-latest: true
 
+      - name: Configure git identity
+        run: |
+          git config --global user.email "test@example.com"
+          git config --global user.name "Test Runner"
+
       - name: Run generator script with automated inputs
         run: |
           printf 'TestApp\ncom.example.testapp\n./test-app\n24\n\n\n#FFFFFF\nY\n' | bash create-android-app.sh
