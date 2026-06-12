@@ -28,7 +28,6 @@ jobs:
           distribution: temurin
           java-version: ${{ env.JAVA_VERSION }}
           check-latest: true
-          cache: gradle
 
       - name: Run generator script with automated inputs
         run: |
