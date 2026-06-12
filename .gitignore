@@ -1,0 +1,16 @@
+# Temp files created by script during icon generation
+/tmp/icon_*
+
+# OS files
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# Editor/IDE
+.idea/
+.vscode/
+*.iml
+
+# Script test output (if you run the generator locally)
+/test-output/
