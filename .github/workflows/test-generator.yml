@@ -49,19 +49,26 @@ jobs:
           SDK: ${{ steps.detect-sdk.outputs.compileSdk }}
         run: |
           SDKMAN="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
-          try_install() {
-            local ver=$1
-            yes | "$SDKMAN" "platforms;android-${ver}" 2>&1 && \
-            yes | "$SDKMAN" "build-tools;${ver}.0.0" 2>&1
-          }
-          try_install "$SDK" && echo "SDK_INSTALLED=$SDK" >> "$GITHUB_ENV" && exit 0
+          # If the expected platform directory exists, use it directly
+          if [ -d "$ANDROID_SDK_ROOT/platforms/android-${SDK}" ]; then
+            echo "android-${SDK} already installed"
+            echo "SDK_INSTALLED=$SDK" >> "$GITHUB_ENV"
+            exit 0
+          fi
+          echo "android-${SDK} not pre-installed, trying to install via SDK manager..."
+          if yes | "$SDKMAN" "platforms;android-${SDK}" 2>&1; then
+            echo "SDK_INSTALLED=$SDK" >> "$GITHUB_ENV"
+            exit 0
+          fi
           echo "android-${SDK} not available, trying fallback platforms..."
-          for FALLBACK in 36 35 34 33; do
-            try_install "$FALLBACK" && \
-              echo "SDK_INSTALLED=$FALLBACK" >> "$GITHUB_ENV" && \
-              sed -i -E "s/compileSdk\s*=\s*[0-9]+/compileSdk = ${FALLBACK}/" test-app/app/build.gradle.kts && \
-              sed -i -E "s/targetSdk\s*=\s*[0-9]+/targetSdk = ${FALLBACK}/" test-app/app/build.gradle.kts && \
+          for FALLBACK in 36 35 34; do
+            if [ -d "$ANDROID_SDK_ROOT/platforms/android-${FALLBACK}" ]; then
+              echo "android-${FALLBACK} already installed, using it"
+              echo "SDK_INSTALLED=${FALLBACK}" >> "$GITHUB_ENV"
+              sed -i -E "s/compileSdk\s*=\s*[0-9]+/compileSdk = ${FALLBACK}/" test-app/app/build.gradle.kts
+              sed -i -E "s/targetSdk\s*=\s*[0-9]+/targetSdk = ${FALLBACK}/" test-app/app/build.gradle.kts
               exit 0
+            fi
           done
           echo "ERROR: No Android SDK platform could be installed!"
           exit 1
@@ -94,13 +101,8 @@ jobs:
           echo "--- Cmdline-tools ---"
           ls "$ANDROID_SDK_ROOT/cmdline-tools/" 2>/dev/null || echo "none"
 
-      - name: Add kotlin-android plugin to generated project
+      - name: Disable configuration cache in generated project
         run: |
-          echo "" >> test-app/gradle/libs.versions.toml
-          echo "kotlin-android = { id = \"org.jetbrains.kotlin.android\", version.ref = \"kotlin\" }" >> test-app/gradle/libs.versions.toml
-          sed -i '/alias(libs.plugins.kotlin.compose) apply false/a\    alias(libs.plugins.kotlin.android) apply false' test-app/build.gradle.kts
-          sed -i '/alias(libs.plugins.kotlin.compose)/a\    alias(libs.plugins.kotlin.android)' test-app/app/build.gradle.kts
-          # Disable configuration cache in gradle.properties
           sed -i 's/org.gradle.configuration-cache=true/org.gradle.configuration-cache=false/' test-app/gradle.properties
 
       - name: Build generated project (assembleDebug)
